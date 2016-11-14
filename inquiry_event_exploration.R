@@ -44,4 +44,3 @@ events_table$imageId[events_table$imageId == "NULL"] <- 0
 # do the same for diagnosis ID 
 events_table$diagnosisId[events_table$diagnosisId != "NULL"] <- 1
 events_table$diagnosisId[events_table$diagnosisId == "NULL"] <- 0
-
