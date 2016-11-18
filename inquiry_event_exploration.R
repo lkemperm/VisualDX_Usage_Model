@@ -17,17 +17,18 @@ hist(inquiry_table$duration)
 library(tm)
 library(SnowballC)
 library(wordcloud)
-searchText <- c("hello VisualDX project test", "project test", "project test test ")
-searchQueryCorpus <- Corpus(VectorSource(searchText))
-searchVector <- inquiry_table[, inquiry_table$searchQuery]
-testCorpus <- Corpus(VectorSource(searchMatrix))
+searchVector <- inquiry_table[, "searchQuery", drop = FALSE]
+topQueries <- sort(table(searchVector), decreasing = TRUE)[1:50]
+topQueries <- topQueries[-1]
+topVector <- rep(names(topQueries), topQueries[names(topQueries)])
+# remove "NONE" observations 
+searchQueryCorpus <- Corpus(VectorSource(topVector))
 searchQueryCorpus <- tm_map(searchQueryCorpus, PlainTextDocument)
 searchQueryCorpus <- tm_map(searchQueryCorpus, removePunctuation)
 searchQueryCorpus <- tm_map(searchQueryCorpus, removeWords, stopwords('english'))
 searchQueryCorpus <- tm_map(searchQueryCorpus, stemDocument)
 pal <- brewer.pal(8, "Dark2")
 wordcloud(searchQueryCorpus, max.words = 100, random.order = FALSE, min.freq = 1, colors = pal)
-
 
 # load events data 
 events_table <- read.csv('data/merged_events.csv', stringsAsFactors = FALSE)
@@ -47,4 +48,15 @@ events_table$diagnosisId[events_table$diagnosisId == "NULL"] <- 0
 events_table$diagnosisId <- as.numeric(events_table$diagnosisId)
 # many null controlIds: may be easier to interpret as 0's 
 events_table$controlId[events_table$controlId == "NULL"]<- 0
+events_table$controlId <- as.numeric(events_table$controlId)
+events_table$eventTypeId <- as.numeric(events_table$eventTypeId)
+# nulls in active view ID also should be interpreted as 0's 
+events_table$activeViewId[events_table$activeViewId == "NULL"] <- 0
+events_table$activeViewId <- as.numeric(events_table$activeViewId)
+# test length and length with na.omit 
+dim(events_table)
+test<- na.omit(events_table)
+dim(test)
+# this removed coerced NA values in controlId when converted to numeric... OK 
+events_table <- na.omit(events_table)
 
