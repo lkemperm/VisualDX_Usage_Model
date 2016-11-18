@@ -53,10 +53,22 @@ events_table$eventTypeId <- as.numeric(events_table$eventTypeId)
 # nulls in active view ID also should be interpreted as 0's 
 events_table$activeViewId[events_table$activeViewId == "NULL"] <- 0
 events_table$activeViewId <- as.numeric(events_table$activeViewId)
+# convert time to date object
+events_table$time <- as.POSIXct(events_table$time)
 # test length and length with na.omit 
 dim(events_table)
 test<- na.omit(events_table)
 dim(test)
 # this removed coerced NA values in controlId when converted to numeric... OK 
 events_table <- na.omit(events_table)
-
+# try: plot relationship between imageID and diagnosisID 
+plot(events_table$imageId, events_table$diagnosisId)
+# too slow! try another solution: histogram of counts where we have both an imageID and diagnosisID
+# try all possible combinations 
+sum(events_table$imageId == 1 & events_table$diagnosisId == 1)
+sum(events_table$imageId == 0 & events_table$diagnosisId == 0)
+sum(events_table$imageId == 1 & events_table$diagnosisId == 0)
+sum(events_table$imageId == 0 & events_table$diagnosisId == 1)
+with(events_table, table(imageId, diagnosisId))
+hist(sum(events_table[events_table$imageId == 1 & events_table$diagnosisId ==1,]), 
+     main = 'Image ID and diagnosis ID of 1')
