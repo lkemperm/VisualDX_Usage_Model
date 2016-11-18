@@ -68,4 +68,8 @@ plot(events_table$imageId, events_table$diagnosisId)
 # table of these combinations
 table<- with(events_table, table(imageId, diagnosisId))
 mosaicplot(table, col = hcl(c(240, 120)),
-           off = c(5, 5, 5, 5), main = "Diagnosis ID vs. Image ID")
+           off = c(5, 5, 5, 5), main = "Diagnosis ID and Image ID")
+avID_imgID <- with(events_table, table(imageId, activeViewId))
+addmargins(avID_imgID)
+av_comp <- prop.table(avID_imgID, 1)
+img_comp <- prop.table(avID_imgID, 2)
