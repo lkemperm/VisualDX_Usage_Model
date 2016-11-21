@@ -1,31 +1,24 @@
-# load inquiry data 
 inquiry_table <- read.csv('data/merged_inquiries.csv', stringsAsFactors = FALSE)
-# drop columns that we are not interested in for now from inquiry table 
 inquiry_table <- subset(inquiry_table, select = -c(inquiryId, certificateId, serverName, eventId, clientId, answerDate))
-# turn inquiry type ID column into numeric data 
 inquiry_table$inquiryTypeId <- as.numeric(inquiry_table$inquiryTypeId)
 inquiry_table$ddxModuleId[inquiry_table$ddxModuleId == "NULL"] <- "NONE"
 
 inquiry_table$diagnosisLookupId[inquiry_table$diagnosisLookupId == "NULL"] <- "NONE"
-# look at possible values for application answer ID 
 unique(unlist(inquiry_table$applicationAnswerId, use.names = FALSE))
-# convert to numeric data 
 inquiry_table$applicationAnswerId <- as.numeric(inquiry_table$applicationAnswerId)
-# same for outcome answer ID 
 unique(unlist(inquiry_table$outcomeAnswerId, use.names = FALSE))
 inquiry_table$outcomeAnswerId <- as.numeric(inquiry_table$outcomeAnswerId)
-# remove NA values
+
 inquiry_table <- na.omit(inquiry_table)
 inquiry_table$startTime <- as.POSIXct(inquiry_table$startTime)
 inquiry_table$endTime <- as.POSIXct(inquiry_table$endTime)
-# create column for duration 
+
 inquiry_table["duration"] = (inquiry_table$endTime - inquiry_table$startTime)
-# replace null with none for search queries 
+
 inquiry_table$searchQuery[inquiry_table$searchQuery == "NULL"] <- "NONE"
-# histogram of inquiry duration after turning data into numeric
 inquiry_table$duration <- as.numeric(inquiry_table$duration)
 hist(inquiry_table$duration)
-# get range in seconds, split range into sub intervals 
+
 range(inquiry_table$duration)
 breaks = seq(0, 24000, by=250)
 duration.cut = cut(inquiry_table$duration, breaks, right=FALSE)
@@ -33,13 +26,19 @@ duration.freq = table(duration.cut)
 cbind(duration.freq)
 hist(log(duration.freq))
 barplot(duration.freq, main = "Barplot of duration intervals")
-# skewed towards very short durations: try logarithm 
-hist(log(inquiry_table$duration))
-# boxplot of duration 
-boxplot(log(inquiry_table$duration), main = "Distribution of log inquiry duration")
 
-# try: making word cloud for search queries 
-# simplify text data 
+hist(log(inquiry_table$duration))
+boxplot(log(inquiry_table$duration), main = "Distribution of log inquiry duration")
+# explore relationship between other features 
+dm_id <- inquiry_table$ddxModuleId
+dl_id <- inquiry_table$diagnosisLookupId
+aa_id <- inquiry_table$applicationAnswerId
+oa_id <- inquiry_table$outcomeAnswerId
+d <- data.frame(dm_id, dl_id, aa_id, oa_id)
+pairs(d)
+cor(aa_id, oa_id)
+plot(inquiry_table$duration, aa_id)
+
 library(tm)
 library(SnowballC)
 library(wordcloud)
