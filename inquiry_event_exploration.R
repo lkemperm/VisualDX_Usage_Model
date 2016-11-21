@@ -36,8 +36,20 @@ aa_id <- inquiry_table$applicationAnswerId
 oa_id <- inquiry_table$outcomeAnswerId
 d <- data.frame(dm_id, dl_id, aa_id, oa_id)
 pairs(d)
+# correlation of numeric features 
 cor(aa_id, oa_id)
-plot(inquiry_table$duration, aa_id)
+library(e1071)
+library(class)
+skewness(aa_id)
+skew.score <- function(c, x) (skewness(log(x + c)))^2
+best.c <- optimise(skew.score, c(0, 20), x = aa_id)$minimum
+best.c
+aaid.transformed <- log(aa_id + best.c)
+hist(aaid.transformed, col = "azure")
+skewness(aaid.transformed)
+
+qqnorm(aaid.transformed)
+qqline(aaid.transformed)
 
 library(tm)
 library(SnowballC)
