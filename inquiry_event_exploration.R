@@ -2,8 +2,21 @@
 inquiry_table <- read.csv('data/merged_inquiries.csv', stringsAsFactors = FALSE)
 # drop columns that we are not interested in for now from inquiry table 
 inquiry_table <- subset(inquiry_table, select = -c(inquiryId, certificateId, serverName, eventId, clientId, answerDate))
-# this cuts off the time 
-inquiry_table$startTime <- format(inquiry_table$startTime, format="%m-%d-%Y-%R%p")
+# turn inquiry type ID column into numeric data 
+inquiry_table$inquiryTypeId <- as.numeric(inquiry_table$inquiryTypeId)
+inquiry_table$ddxModuleId[inquiry_table$ddxModuleId == "NULL"] <- "NONE"
+
+inquiry_table$diagnosisLookupId[inquiry_table$diagnosisLookupId == "NULL"] <- "NONE"
+# look at possible values for application answer ID 
+unique(unlist(inquiry_table$applicationAnswerId, use.names = FALSE))
+# convert to numeric data 
+inquiry_table$applicationAnswerId <- as.numeric(inquiry_table$applicationAnswerId)
+# same for outcome answer ID 
+unique(unlist(inquiry_table$outcomeAnswerId, use.names = FALSE))
+inquiry_table$outcomeAnswerId <- as.numeric(inquiry_table$outcomeAnswerId)
+# remove NA values
+inquiry_table <- na.omit(inquiry_table)
+inquiry_table$startTime <- as.POSIXct(inquiry_table$startTime)
 inquiry_table$endTime <- format(inquiry_table$endTime, format="%m-%d-%Y-%R%p")
 # create column for duration 
 inquiry_table["duration"] = (inquiry_table$endTime - inquiry_table$startTime)
@@ -64,7 +77,6 @@ events_table$time <- as.POSIXct(events_table$time)
 # try: plot relationship between imageID and diagnosisID 
 plot(events_table$imageId, events_table$diagnosisId)
 # too slow! try another solution: histogram of counts where we have both an imageID and diagnosisID
-# try all possible combinations 
 # table of these combinations
 table<- with(events_table, table(imageId, diagnosisId))
 mosaicplot(table, col = hcl(c(240, 120)),
