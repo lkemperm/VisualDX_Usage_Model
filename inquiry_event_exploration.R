@@ -17,7 +17,7 @@ inquiry_table$outcomeAnswerId <- as.numeric(inquiry_table$outcomeAnswerId)
 # remove NA values
 inquiry_table <- na.omit(inquiry_table)
 inquiry_table$startTime <- as.POSIXct(inquiry_table$startTime)
-inquiry_table$endTime <- format(inquiry_table$endTime, format="%m-%d-%Y-%R%p")
+inquiry_table$endTime <- as.POSIXct(inquiry_table$endTime)
 # create column for duration 
 inquiry_table["duration"] = (inquiry_table$endTime - inquiry_table$startTime)
 # replace null with none for search queries 
@@ -25,6 +25,19 @@ inquiry_table$searchQuery[inquiry_table$searchQuery == "NULL"] <- "NONE"
 # histogram of inquiry duration after turning data into numeric
 inquiry_table$duration <- as.numeric(inquiry_table$duration)
 hist(inquiry_table$duration)
+# get range in seconds, split range into sub intervals 
+range(inquiry_table$duration)
+breaks = seq(0, 24000, by=250)
+duration.cut = cut(inquiry_table$duration, breaks, right=FALSE)
+duration.freq = table(duration.cut)
+cbind(duration.freq)
+hist(log(duration.freq))
+barplot(duration.freq, main = "Barplot of duration intervals")
+# skewed towards very short durations: try logarithm 
+hist(log(inquiry_table$duration))
+# boxplot of duration 
+boxplot(log(inquiry_table$duration), main = "Distribution of log inquiry duration")
+
 # try: making word cloud for search queries 
 # simplify text data 
 library(tm)
@@ -32,9 +45,9 @@ library(SnowballC)
 library(wordcloud)
 searchVector <- inquiry_table[, "searchQuery", drop = FALSE]
 topQueries <- sort(table(searchVector), decreasing = TRUE)[1:50]
+# remove "NONE" observations 
 topQueries <- topQueries[-1]
 topVector <- rep(names(topQueries), topQueries[names(topQueries)])
-# remove "NONE" observations 
 searchQueryCorpus <- Corpus(VectorSource(topVector))
 searchQueryCorpus <- tm_map(searchQueryCorpus, PlainTextDocument)
 searchQueryCorpus <- tm_map(searchQueryCorpus, removePunctuation)
