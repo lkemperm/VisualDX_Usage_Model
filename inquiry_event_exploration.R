@@ -1,8 +1,8 @@
 inquiry_table <- read.csv('data/merged_inquiries.csv', stringsAsFactors = FALSE)
 inquiry_table <- subset(inquiry_table, select = -c(inquiryId, certificateId, serverName, eventId, clientId, answerDate))
+
 inquiry_table$inquiryTypeId <- as.numeric(inquiry_table$inquiryTypeId)
 inquiry_table$ddxModuleId[inquiry_table$ddxModuleId == "NULL"] <- "NONE"
-
 inquiry_table$diagnosisLookupId[inquiry_table$diagnosisLookupId == "NULL"] <- "NONE"
 unique(unlist(inquiry_table$applicationAnswerId, use.names = FALSE))
 inquiry_table$applicationAnswerId <- as.numeric(inquiry_table$applicationAnswerId)
@@ -20,7 +20,7 @@ inquiry_table$duration <- as.numeric(inquiry_table$duration)
 hist(inquiry_table$duration)
 
 range(inquiry_table$duration)
-breaks = seq(0, 24000, by=250)
+breaks = seq(0, 24000, by=3000)
 duration.cut = cut(inquiry_table$duration, breaks, right=FALSE)
 duration.freq = table(duration.cut)
 cbind(duration.freq)
@@ -35,21 +35,31 @@ dl_id <- inquiry_table$diagnosisLookupId
 aa_id <- inquiry_table$applicationAnswerId
 oa_id <- inquiry_table$outcomeAnswerId
 d <- data.frame(dm_id, dl_id, aa_id, oa_id)
-pairs(d)
+# check out this table where the diagnosis lookup ID is NONE 
+d2 <- d[which(dl_id == "NONE"),]
 # correlation of numeric features 
 cor(aa_id, oa_id)
-library(e1071)
-library(class)
-skewness(aa_id)
-skew.score <- function(c, x) (skewness(log(x + c)))^2
-best.c <- optimise(skew.score, c(0, 20), x = aa_id)$minimum
-best.c
-aaid.transformed <- log(aa_id + best.c)
-hist(aaid.transformed, col = "azure")
-skewness(aaid.transformed)
+# check out table where both ddx module id and diagnosis lookup ID are NONE 
+d3 <- d[which(dl_id == "NONE" && dm_id == "NONE"),]
+# check out table where application answer ID is not 0 (apparent most common value)
+d4 <- d[which(aa_id != 0),]
+d5 <- d[which(oa_id != 0),]
+d6 <- d[which(aa_id == 1),]
+d7 <- d[which(dm_id != "NONE" && dl_id != "NONE"),]
+nrow(d5)
+nrow(d4)
+nrow(d)
+# look at distribution of times 
+boxplot(inquiry_table$startTime)
+hist(inquiry_table$startTime, breaks = "days")
+# split up by year 
+hist(inquiry_table$startTime, breaks = "years")
 
-qqnorm(aaid.transformed)
-qqline(aaid.transformed)
+library(ggplot2)
+ggplot(inquiry_table, aes(startTime)) +
+  geom_density()
+ggplot(inquiry_table, aes(startTime, duration) ) +
+  geom_jitter()
 
 library(tm)
 library(SnowballC)
@@ -69,39 +79,51 @@ wordcloud(searchQueryCorpus, max.words = 100, random.order = FALSE, min.freq = 1
 
 # load events data 
 events_table <- read.csv('data/merged_events.csv', stringsAsFactors = FALSE)
-# drop columns that we are not interested in for now from events table 
 events_table <- subset(events_table, select = -c(eventId, moduleId, sessionId, serverName))
-# count null image IDs, diagnosis IDS to see if this is useful
-# i.e. if there is a relationship between image ID being null and another feature
-sum((events_table$imageId) == "NULL")
-sum((events_table$diagnosisId) == "NULL")
-# replace null values with 0, otherwise 1 (8502938 null objects)
+
 events_table$imageId[events_table$imageId != "NULL"] <- 1
 events_table$imageId[events_table$imageId == "NULL"] <- 0
 events_table$imageId <- as.numeric(events_table$imageId)
-# do the same for diagnosis ID 
+
 events_table$diagnosisId[events_table$diagnosisId != "NULL"] <- 1
 events_table$diagnosisId[events_table$diagnosisId == "NULL"] <- 0
 events_table$diagnosisId <- as.numeric(events_table$diagnosisId)
-# many null controlIds: may be easier to interpret as 0's 
+
 events_table$controlId[events_table$controlId == "NULL"]<- 0
 events_table$controlId <- as.numeric(events_table$controlId)
 events_table$eventTypeId <- as.numeric(events_table$eventTypeId)
-# nulls in active view ID also should be interpreted as 0's 
+
 events_table$activeViewId[events_table$activeViewId == "NULL"] <- 0
 events_table$activeViewId <- as.numeric(events_table$activeViewId)
-# test length and length with na.omit 
-dim(events_table)
-test<- na.omit(events_table)
-dim(test)
-# this removed coerced NA values in controlId when converted to numeric... OK 
+
 events_table <- na.omit(events_table)
-# convert time to date object
 events_table$time <- as.POSIXct(events_table$time)
-# try: plot relationship between imageID and diagnosisID 
+hist(events_table$eventTypeId)
+
+ggplot(events_table, aes(diagnosisId, fill=eventTypeId), col = c(1:10)) +
+  geom_bar(position="fill")
+
+ggplot(events_table, aes(eventTypeId)) + geom_bar() +
+  facet_wrap(~ diagnosisId)
+
+cor(events_table$imageId, events_table$diagnosisId)
+
+ggplot(events_table, aes(eventTypeId)) +
+  geom_freqpoly(aes(group = diagnosisId, colour = diagnosisId))
+
+ggplot(events_table, aes(time)) +
+  geom_freqpoly(aes(group = eventTypeId, colour = eventTypeId))
+
+ggplot(events_table, aes(eventTypeId)) +
+  geom_freqpoly(aes(group = activeViewId, colour = activeViewId))
+
+cor(events_table$eventTypeId, events_table$activeViewId)
+
+ggplot(events_table,
+       aes(diagnosisId, eventTypeId )) +
+  geom_point() + geom_boxplot()
+
 plot(events_table$imageId, events_table$diagnosisId)
-# too slow! try another solution: histogram of counts where we have both an imageID and diagnosisID
-# table of these combinations
 table<- with(events_table, table(imageId, diagnosisId))
 mosaicplot(table, col = hcl(c(240, 120)),
            off = c(5, 5, 5, 5), main = "Diagnosis ID and Image ID")
