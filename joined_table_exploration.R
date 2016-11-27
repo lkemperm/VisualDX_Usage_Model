@@ -7,10 +7,10 @@ merged_table <- subset(merged_table, select = -c(eventId, controlId, sessionId, 
 hist(merged_table$eventTypeId)
 
 # histogram of image count 
-hist(merged_table$imageCount)
+hist(log(merged_table$imageCount))
 
 # histogram of diagnosis count 
-hist(merged_table$diagnosisCount)
+hist(log(merged_table$diagnosisCount))
 
 # plot image count vs. diagnosis count 
 plot(merged_table$imageCount, df$diagnosisCount)
@@ -28,7 +28,8 @@ merged_table$sessionEnd = as.POSIXct(merged_table$sessionEnd)
 merged_table["duration"] = (merged_table$sessionEnd-merged_table$sessionStart)
 plot(merged_table$duration, merged_table$imageCount)
 merged_table$duration <- as.numeric(merged_table$duration)
-hist(merged_table$duration)
+plot(merged_table$imageCount, merged_table$diagnosisCount)
+hist(log(merged_table$duration))
 boxplot(merged_table$duration, horizontal = TRUE)
 
 require(ggplot2)

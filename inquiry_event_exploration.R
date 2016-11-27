@@ -119,9 +119,11 @@ ggplot(events_table, aes(eventTypeId)) +
 
 cor(events_table$eventTypeId, events_table$activeViewId)
 
-ggplot(events_table,
-       aes(diagnosisId, eventTypeId )) +
-  geom_point() + geom_boxplot()
+# ggplot(events_table, aes(diagnosisId, fill = imageId)) +
+#   geom_bar(position = "fill")
+
+ggplot(data=events_table, aes(x=time, y=eventTypeId, fill=diagnosisId)) +
+  geom_bar(stat="identity", position=position_dodge())
 
 plot(events_table$imageId, events_table$diagnosisId)
 table<- with(events_table, table(imageId, diagnosisId))
