@@ -1,5 +1,5 @@
 ### load data 
-VisualDx.Data <- read.csv("VisualDx Data.csv")
+VisualDx.Data <- read.csv("clientSession(2014-2016).csv")
 
 ### subset initial ClientSession table
 keep <- c("productId", "agent", "sessionStart", "sessionEnd", 
@@ -21,3 +21,15 @@ mobile["duration"] = (mobile$sessionEnd-mobile$sessionStart)
 
 ### make duration numeric
 mobile$duration<-as.numeric(mobile$duration)
+
+### plot duration
+library("ggplot2")
+ggplot(aes(x=as.POSIXct(mobile$modTime), y=imageCount), data = mobile) + geom_line() 
+
+p<-ggplot(mobile, aes(x = duration))
+p + geom_histogram(stat = "bin", binwidth=1000)
+
+### barplot
+barplot(c(nrow(mobile), nrow(PC)), names.arg=c("Mobile", "PC"), main="Mobile and PC Usage",
+        ylab="Number of Instances", col="dark green")
+
