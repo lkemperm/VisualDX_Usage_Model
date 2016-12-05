@@ -66,49 +66,7 @@ inquiry.ts <- xts(as.numeric(inquiry_table$duration), order.by=inquiry_table$sta
 plot(inquiry.ts)
 periodicity(inquiry.ts)
 
-# get hourly duration
-x <- inquiry_table$startTime
-mo <- strftime(x, "%m")
-yr <- strftime(x, "%Y")
-day <- strftime(x, "%d")
-hour <- strftime(x, "%H")
-dur <- inquiry_table$duration
-dd <- data.frame(hour, day, mo, yr, dur)
-dd.agg <- aggregate(dur ~ hour + day + mo + yr, FUN = sum)
-
-toDate <- function(year, month, day){
-  ISOdate(year, month, day)
-}
-require(chron)
-testDate <- dd.agg[2,]
-d <- toDate(testDate$yr, testDate$mo, testDate$day)
-t<- timeDate(d)
-isHoliday(t)
-
-dd.agg["holiday"] <- ifelse(isHoliday(timeDate(toDate(dd.agg$yr, dd.agg$mo, dd.agg$day))), 0, 1)
-dd.agg["businessDay"] <- ifelse(isBizday(timeDate(toDate(dd.agg$yr, dd.agg$mo, dd.agg$day))), 0, 1)
-dd.agg["peakHour"] <- ifelse((dd.agg$hour ==11 | dd.agg$hour == 12 | dd.agg$hour == 13 | dd.agg$hour == 14), 
-                             0, 1)
-inquiry_pred <- subset(dd.agg, select = -c(mo, day, hour))
-inquiry_pred$yr <- as.factor(inquiry_pred$yr)
-# split data into test and train
-smp_size <- floor(0.75*nrow(inquiry_pred))
-set.seed(123)
-train_ind <- sample(seq_len(nrow(inquiry_pred)), size = smp_size)
-train <- inquiry_pred[train_ind,]
-test <- inquiry_pred[-train_ind,]
-
-# try neural net 
-library(neuralnet)
-m <- model.matrix(~dur + yr + holiday + businessDay + peakHour)
-n <- names(train)
-f <- as.formula(paste("dur ~", paste(n[!n %in% "dur"], collapse = " + ")))
-nn <- neuralnet(f, data = train, hidden = c(5,3), linear.output = T)
-
-
-
-
-
+# get daily average, max of duration
 fit <- stl(inquiry.ts, s.window="period")
 decompose(inquiry.ts, frequency = c(876572,1080603,1453601))
 dAvg <- apply.daily(inquiry.ts, function(x) apply(x, 2, mean)) 
@@ -125,6 +83,8 @@ duration.freq = table(duration.cut)
 cbind(duration.freq)
 hist(log(duration.freq))
 barplot(duration.freq, main = "Barplot of duration intervals")
+
+
 
 # explore relationship between other features 
 dm_id <- inquiry_table$ddxModuleId
