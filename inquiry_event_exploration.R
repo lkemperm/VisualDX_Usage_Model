@@ -67,12 +67,12 @@ plot(inquiry.ts)
 periodicity(inquiry.ts)
 inquiry.2015 <- inquiry.ts['2015']
 # get daily average, max of duration
-fit <- stl(inquiry.ts, s.window="period")
-decompose(inquiry.ts, frequency = c(876572,1080603,1453601))
-dAvg <- apply.daily(inquiry.ts, function(x) apply(x, 2, mean)) 
-plot(as.xts(dAvg), main = "Daily average duration for inquiry", col = "blue", minor.ticks=FALSE)
-dMax <- apply.daily(inquiry.ts, function(x) apply(x, 2, max))  # daily max
-plot(as.xts(dMax), main = "Daily maximum duration for inquiry", col = "red", minor.ticks=FALSE)
+# fit <- stl(inquiry.ts, s.window="period")
+# decompose(inquiry.ts, frequency = c(876572,1080603,1453601))
+dAvg <- apply.daily(inquiry.2015, function(x) apply(x, 2, mean)) 
+plot(as.xts(dAvg), main = "Daily average duration for inquiry (2015)", col = "blue", minor.ticks=FALSE)
+dMax <- apply.daily(inquiry.2015, function(x) apply(x, 2, max))  # daily max
+plot(as.xts(dMax), main = "Daily maximum duration for inquiry (2015)", col = "red", minor.ticks=FALSE)
 
 hrAvg <- period.apply(inquiry.ts, endpoints(inquiry.ts, on = "hours", 1), function(x) apply(x, 2, mean))
 # break duration into sub-intervals of size 3000 

@@ -20,11 +20,17 @@ testDate <- dd.agg[2,]
 d <- toDate(testDate$yr, testDate$mo, testDate$day)
 t<- timeDate(d)
 isHoliday(t)
+# convert day, hour to numeric 
+dd.agg$day <- as.numeric(dd.agg$day)
+dd.agg$hour <- as.numeric(dd.agg$hour)
 
+# add new columns for holiday, business day peak hour
 dd.agg["holiday"] <- ifelse(isHoliday(timeDate(toDate(dd.agg$yr, dd.agg$mo, dd.agg$day))), 0, 1)
 dd.agg["businessDay"] <- ifelse(isBizday(timeDate(toDate(dd.agg$yr, dd.agg$mo, dd.agg$day))), 0, 1)
-dd.agg["peakHour"] <- ifelse((dd.agg$hour ==11 | dd.agg$hour == 12 | dd.agg$hour == 13 | dd.agg$hour == 14), 
-                             0, 1)
+dd.agg["peakHour"] <- ifelse(((dd.agg$hour >= 11) & (dd.agg$hour <= 14)), 1, 0)
+dd.agg["residencyProgram"] <- ifelse(((dd.agg$mo == "06") & (dd.agg$day>=15)), 1 , 0)
+dd.agg[dd.agg$residencyProgram == 1,]
+dd.agg[dd.agg$peakHour == 1,]
 
 inquiry_pred <- subset(dd.agg, select = -c(mo, day, hour, yr))
 # data = inquiry_pred[, c('holiday', 'businessDay', 'peakHour')]
@@ -49,12 +55,13 @@ train_ <- scaled[train_ind,]
 test_ <- scaled[-train_ind,]
 
 # fit neural network to the data to predict hourly duration 
-m <- model.matrix(~dur + holiday + businessDay + peakHour, data = train_)
-nn <- neuralnet(dur ~ holiday + businessDay + peakHour, data = m, hidden = 2, linear.output = T)
+m <- model.matrix(~dur + holiday + businessDay + peakHour + residencyProgram, data = train_)
+nn <- neuralnet(dur ~ holiday + businessDay + peakHour + residencyProgram, data = m, 
+                hidden = 3, linear.output = T)
 
 # try on test data set 
-m2 <- model.matrix(~dur + holiday + businessDay + peakHour, data = test_)
-cols <- c("holiday", "businessDay", "peakHour")
+m2 <- model.matrix(~dur + holiday + businessDay + peakHour + residencyProgram, data = test_)
+cols <- c("holiday", "businessDay", "peakHour", "residencyProgram")
 cov <- subset(m2, select = cols)
 pr.nn <- compute(nn, cov)
 pr.nn_ <- pr.nn$net.result*(max(inquiry_pred$dur)-
@@ -78,5 +85,10 @@ svm.pred <- predict(svm.model, testset[,-1])
 rpart.model <- rpart(formula = dur ~ ., data = trainset)
 rpart.pred <- predict(rpart.model, testset[,-1])
 
-table(pred = svm.pred, true = testset[,1])
+svm.t <- table(pred = svm.pred, true = testset[,1])
 table(pred = rpart.pred, true = testset[,1])
+library(caret)
+u <- union(rpart.pred, testset[,1])
+t <- table(factor(rpart.pred, u), factor(testset[,1], u))
+confusionMatrix(t)
+confusionMatrix(svm.t)
