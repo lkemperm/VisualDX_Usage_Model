@@ -39,9 +39,6 @@ i2$diagnosisLookupId
 i3 <- inquiry_table[inquiry_table$inquiryTypeId == 3,]
 i4 <- inquiry_table[inquiry_table$inquiryTypeId == 4,]
 
-# split up by year 
-# i1_2016<- i1[i1$startTime %within% int,]
-# i2_2016<- i2[i2$startTime %within% int,]
 
 # compare durations 
 range(i1$duration)
@@ -69,14 +66,7 @@ inquiry.ts <- xts(as.numeric(inquiry_table$duration), order.by=inquiry_table$sta
 plot(inquiry.ts)
 periodicity(inquiry.ts)
 
-# try plotting to visualize trends 
-library(timeSeries)
-test <- timeSeries(inquiry_table[,9], start=2012, freq=12)
-plot(stl(log(inquiry.ts), s.window="periodic"))
-# acf(inquiry.ts, col="red")
-
-# get daily duration 
-# t <- aggregate(inquiry_table$duration, by=list(day = inquiry_table$startTime), FUN=sum)
+# get hourly duration
 x <- inquiry_table$startTime
 mo <- strftime(x, "%m")
 yr <- strftime(x, "%Y")
@@ -95,19 +85,26 @@ d <- toDate(testDate$yr, testDate$mo, testDate$day)
 t<- timeDate(d)
 isHoliday(t)
 
-dd.agg["holiday"] <- !isHoliday(timeDate(toDate(dd.agg$yr, dd.agg$mo, dd.agg$day)))
-dd.agg["businessDay"] <- !isBizday(timeDate(toDate(dd.agg$yr, dd.agg$mo, dd.agg$day)))
-# dd.agg["peakHour"] <- try 11-2 
-
+dd.agg["holiday"] <- ifelse(isHoliday(timeDate(toDate(dd.agg$yr, dd.agg$mo, dd.agg$day))), 0, 1)
+dd.agg["businessDay"] <- ifelse(isBizday(timeDate(toDate(dd.agg$yr, dd.agg$mo, dd.agg$day))), 0, 1)
+dd.agg["peakHour"] <- ifelse((dd.agg$hour ==11 | dd.agg$hour == 12 | dd.agg$hour == 13 | dd.agg$hour == 14), 
+                             0, 1)
+inquiry_pred <- subset(dd.agg, select = -c(mo, day, hour))
+inquiry_pred$yr <- as.factor(inquiry_pred$yr)
 # split data into test and train
-smp_size <- floor(0.75*nrow(inquiry_table))
+smp_size <- floor(0.75*nrow(inquiry_pred))
 set.seed(123)
-train_ind <- sample(seq_len(nrow(inquiry_table)), size = smp_size)
-train <- inquiry_table[train_ind,]
-test <- inquiry_table[-train_ind,]
+train_ind <- sample(seq_len(nrow(inquiry_pred)), size = smp_size)
+train <- inquiry_pred[train_ind,]
+test <- inquiry_pred[-train_ind,]
 
 # try neural net 
 library(neuralnet)
+m <- model.matrix(~dur + yr + holiday + businessDay + peakHour)
+n <- names(train)
+f <- as.formula(paste("dur ~", paste(n[!n %in% "dur"], collapse = " + ")))
+nn <- neuralnet(f, data = train, hidden = c(5,3), linear.output = T)
+
 
 
 
