@@ -1,21 +1,6 @@
 library(e1071)
 library(rpart)
-
-index <- 1:nrow(inquiry_pred)
-testindex <- sample(index, trunc(length(index)/3))
-testset <- inquiry_pred[testindex,]
-trainset <- inquiry_pred[-testindex,]
-
-# svm 
-svm.model <- svm(formula = dur ~ ., data = trainset, cost = 100, gamma = 1)
-svm.pred <- predict(svm.model, testset[,-1])
-
-# rpart 
-rpart.model <- rpart(formula = dur ~ ., data = trainset)
-rpart.pred <- predict(rpart.model, testset[,-1])
-
-table(pred = svm.pred, true = testset[,1])
-table(pred = rpart.pred, true = testset[,1])
+library(neuralnet)
 
 # get hourly duration
 x <- inquiry_table$startTime
@@ -64,7 +49,6 @@ train_ <- scaled[train_ind,]
 test_ <- scaled[-train_ind,]
 
 # fit neural network to the data to predict hourly duration 
-library(neuralnet)
 m <- model.matrix(~dur + holiday + businessDay + peakHour, data = train_)
 nn <- neuralnet(dur ~ holiday + businessDay + peakHour, data = m, hidden = 2, linear.output = T)
 
@@ -79,3 +63,20 @@ test.r <- (test_$dur) * (max(inquiry_pred$dur)-
                            min(inquiry_pred$dur))+min(inquiry_pred$dur)
 MSE.nn <- sum((test.r-pr.nn_)^2)/nrow(test)
 print(paste(MSE.lm, MSE.nn))
+
+
+index <- 1:nrow(inquiry_pred)
+testindex <- sample(index, trunc(length(index)/3))
+testset <- inquiry_pred[testindex,]
+trainset <- inquiry_pred[-testindex,]
+
+# svm 
+svm.model <- svm(formula = dur ~ ., data = trainset, cost = 100, gamma = 1)
+svm.pred <- predict(svm.model, testset[,-1])
+
+# rpart 
+rpart.model <- rpart(formula = dur ~ ., data = trainset)
+rpart.pred <- predict(rpart.model, testset[,-1])
+
+table(pred = svm.pred, true = testset[,1])
+table(pred = rpart.pred, true = testset[,1])
