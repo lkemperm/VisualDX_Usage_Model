@@ -2,7 +2,7 @@
 inquiry_table <- read.csv('data/merged_inquiries.csv', stringsAsFactors = FALSE)
 inquiry_table <- subset(inquiry_table, select = -c(inquiryId, certificateId, serverName, eventId, clientId, answerDate))
 
-# replace null calues 
+# replace null values 
 inquiry_table$ddxModuleId[inquiry_table$ddxModuleId == "NULL"] <- "NONE"
 inquiry_table$diagnosisLookupId[inquiry_table$diagnosisLookupId == "NULL"] <- 0
 inquiry_table$searchQuery[inquiry_table$searchQuery == "NULL"] <- "NONE"
@@ -24,7 +24,7 @@ inquiry_table$endTime <- as.POSIXct(inquiry_table$endTime)
 inquiry_table["duration"] = (inquiry_table$endTime - inquiry_table$startTime)
 inquiry_table$duration <- as.numeric(inquiry_table$duration)
 # histogram of duration 
-hist(log(inquiry_table$duration))
+hist(log(inquiry_table$duration), main = "Histogram of log inquiry durations", col = "blue")
 
 # create date intervals to look at different subsets
 library(lubridate)
@@ -38,7 +38,6 @@ i2 <- inquiry_table[inquiry_table$inquiryTypeId == 2,]
 i2$diagnosisLookupId
 i3 <- inquiry_table[inquiry_table$inquiryTypeId == 3,]
 i4 <- inquiry_table[inquiry_table$inquiryTypeId == 4,]
-
 
 # compare durations 
 range(i1$duration)
@@ -66,15 +65,15 @@ inquiry.ts <- xts(as.numeric(inquiry_table$duration), order.by=inquiry_table$sta
 plot(inquiry.ts)
 periodicity(inquiry.ts)
 inquiry.2015 <- inquiry.ts['2015']
+
 # get daily average, max of duration
-# fit <- stl(inquiry.ts, s.window="period")
-# decompose(inquiry.ts, frequency = c(876572,1080603,1453601))
 dAvg <- apply.daily(inquiry.2015, function(x) apply(x, 2, mean)) 
 plot(as.xts(dAvg), main = "Daily average duration for inquiry (2015)", col = "blue", minor.ticks=FALSE)
 dMax <- apply.daily(inquiry.2015, function(x) apply(x, 2, max))  # daily max
 plot(as.xts(dMax), main = "Daily maximum duration for inquiry (2015)", col = "red", minor.ticks=FALSE)
 
 hrAvg <- period.apply(inquiry.ts, endpoints(inquiry.ts, on = "hours", 1), function(x) apply(x, 2, mean))
+
 # break duration into sub-intervals of size 3000 
 range(inquiry_table$duration)
 breaks = seq(0, 24000, by=3000)
@@ -84,20 +83,22 @@ cbind(duration.freq)
 hist(log(duration.freq))
 barplot(duration.freq, main = "Barplot of duration intervals")
 
-
-
 # explore relationship between other features 
 dm_id <- inquiry_table$ddxModuleId
 dl_id <- inquiry_table$diagnosisLookupId
 aa_id <- inquiry_table$applicationAnswerId
 oa_id <- inquiry_table$outcomeAnswerId
 d <- data.frame(dm_id, dl_id, aa_id, oa_id)
+
 # check out this table where the diagnosis lookup ID is NONE 
 d2 <- d[which(dl_id == "NONE"),]
+
 # correlation of numeric features 
 cor(aa_id, oa_id)
+
 # check out table where both ddx module id and diagnosis lookup ID are NONE 
 d3 <- d[which(dl_id == "NONE" && dm_id == "NONE"),]
+
 # check out table where application answer ID is not 0 (apparent most common value)
 d4 <- d[which(aa_id != 0),]
 d5 <- d[which(oa_id != 0),]
@@ -110,6 +111,7 @@ nrow(d)
 # look at distribution of inquiries over time 
 boxplot(inquiry_table$startTime)
 hist(inquiry_table$startTime, breaks = "days")
+
 # split up by year 
 hist(inquiry_table$startTime, breaks = "years")
 
@@ -209,9 +211,9 @@ addmargins(avID_imgID)
 av_comp <- prop.table(avID_imgID, 1)
 img_comp <- prop.table(avID_imgID, 2)
 
+# try time series object for event 
 library(TTR)
 require(xts)
 events.ts <- xts(events_table, order.by=as.POSIXct(events_table$time))
-# event_timeseries_comp <- decompose(events.ts)
 axTicksByTime(events.ts, ticks.on='months')
 events.ts.test <- events.ts['2014-03']

@@ -1,60 +1,91 @@
 library(e1071)
 library(rpart)
 library(neuralnet)
+library(chron)
+library(timeDate)
 
-# get hourly duration
-x <- inquiry_table$startTime
-mo <- strftime(x, "%m")
-yr <- strftime(x, "%Y")
-day <- strftime(x, "%d")
-hour <- strftime(x, "%H")
-dur <- inquiry_table$duration
-dd <- data.frame(hour, day, mo, yr, dur)
-dd.agg <- aggregate(dur ~ hour + day + mo + yr, FUN = sum)
+clientSession$sessionStart <- as.POSIXct(clientSession$sessionStart)
 
 toDate <- function(year, month, day){
   ISOdate(year, month, day)
 }
-require(chron)
-testDate <- dd.agg[2,]
-d <- toDate(testDate$yr, testDate$mo, testDate$day)
-t<- timeDate(d)
-isHoliday(t)
-# convert day, hour to numeric 
-dd.agg$day <- as.numeric(dd.agg$day)
-dd.agg$hour <- as.numeric(dd.agg$hour)
+# aggregate outcome by hour 
+aggregateByHour <- function(x, start, y){
+  time <- x[[start]]
+  mo <- strftime(time, "%m")
+  yr <- strftime(time, "%Y")
+  day <- strftime(time, "%d")
+  hour <- strftime(time, "%H")
+  outcome <- x[[y]]
+  new_df <- data.frame(hour, day, mo, yr, outcome)
+  agg <- aggregate(outcome ~ hour + day + mo + yr, FUN = sum)
+  agg$day <- as.numeric(agg$day)
+  agg$hour <- as.numeric(agg$hour)
+  agg["holiday"] <- ifelse(isHoliday(timeDate(toDate(agg$yr, agg$mo, agg$day))), 0, 1)
+  agg["businessDay"] <- ifelse(isBizday(timeDate(toDate(agg$yr, agg$mo, agg$day))), 0, 1)
+  agg["peakHour"] <- ifelse(((agg$hour >= 11) & (agg$hour <= 14)), 1, 0)
+  agg["residencyProgram"] <- ifelse(((agg$mo == "06") & (agg$day>=15)), 1 , 0)
+  pred_df <- subset(agg, select = -c(mo, day, hour, yr))
+return(pred_df)
+}
 
-# add new columns for holiday, business day peak hour
-dd.agg["holiday"] <- ifelse(isHoliday(timeDate(toDate(dd.agg$yr, dd.agg$mo, dd.agg$day))), 0, 1)
-dd.agg["businessDay"] <- ifelse(isBizday(timeDate(toDate(dd.agg$yr, dd.agg$mo, dd.agg$day))), 0, 1)
-dd.agg["peakHour"] <- ifelse(((dd.agg$hour >= 11) & (dd.agg$hour <= 14)), 1, 0)
-dd.agg["residencyProgram"] <- ifelse(((dd.agg$mo == "06") & (dd.agg$day>=15)), 1 , 0)
-dd.agg[dd.agg$residencyProgram == 1,]
-dd.agg[dd.agg$peakHour == 1,]
+clientSession.ts <- aggregateByHour(clientSession, "sessionStart", "imageCount")
+inquiry.ts <- aggregateByHour(inquiry_table, "startTime", "duration")
 
-inquiry_pred <- subset(dd.agg, select = -c(mo, day, hour, yr))
-# data = inquiry_pred[, c('holiday', 'businessDay', 'peakHour')]
-# split data into test and train
-smp_size <- floor(0.75*nrow(inquiry_pred))
-set.seed(123)
-train_ind <- sample(seq_len(nrow(inquiry_pred)), size = smp_size)
-train <- inquiry_pred[train_ind,]
-test <- inquiry_pred[-train_ind,]
+get_train_ind<- function(pred){
+  smp_size <- floor(0.75*nrow(pred))
+  set.seed(123)
+  train_ind <- sample(seq_len(nrow(pred)), size = smp_size)
+return(train_ind)
+}
 
-# fit linear model to test against NN 
-lm.fit <- glm(dur~., data = train)
-summary(lm.fit)
-pr.lm <- predict(lm.fit, test)
-MSE.lm <- sum((pr.lm-test$dur)^2)/nrow(test)
+# get indicies to split test and train data 
+client_index <- get_train_ind(clientSession.ts)
+inquiry_index <- get_train_ind(inquiry.ts)
 
-# scale data before fitting NN 
-maxs <- apply(inquiry_pred, 2, max)
-mins <- apply(inquiry_pred, 2, min)
-scaled <- as.data.frame(scale(inquiry_pred, center=mins, scale = maxs-mins))
-train_ <- scaled[train_ind,]
-test_ <- scaled[-train_ind,]
+# client train and test sets 
+client_train <- clientSession.ts[client_index,]
+client_test <- clientSession.ts[-client_index,]
 
-# fit neural network to the data to predict hourly duration 
+# inquiry train and test sets 
+inquiry_train <- inquiry.ts[inquiry_index,]
+inquiry_test <- inquiry.ts[-inquiry_index,]
+
+# fit linear model to compare to NN 
+lm.inquiry <- glm(outcome~., data = inquiry_train)
+summary(lm.inquiry)
+pr.inquiry <- predict(lm.inquiry, inquiry_test)
+MSE.inquiry <- sum((pr.inquiry-inquiry_test$outcome)^2)/nrow(inquiry_test)
+
+lm.clientSession <- glm(outcome~., data = client_train)
+summary(lm.clientSession)
+pr.clientSession <- predict(lm.clientSession, client_test)
+MSE.clientSession <- sum((pr.clientSession-client_test$outcome)^2)/nrow(client_test)
+
+scale_data <- function(pred){
+  maxs <- apply(pred, 2, max)
+  mins <- apply(pred, 2, min)
+  scaled <- as.data.frame(scale(pred, center=mins, scale = maxs-mins))
+return(scaled)
+}
+# scaled data -- use to get new train and test data 
+scaled_inquiry <- scale_data(inquiry.ts)
+scaled_client <- scale_data(clientSession.ts)
+
+inquiry_train_ <- scaled_inquiry[inquiry_index,]
+inquiry_test_ <- scaled_inquiry[-inquiry_index,]
+client_train_ <- scaled_client[client_index,]
+client_test_ <- scaled_client[-client_index,]
+
+
+# fit neural network to the data to predict hourly outcome 
+fit_nn <- function(train, hiddenVal){
+  m <- model.matrix(~outcome + holiday + businessDay + peakHour + residencyProgram, data = train)
+  nn <- neuralnet(outcome ~ holiday + businessDay + peakHour + residencyProgram, data = train, 
+                  hidden = hiddenVal, linear.output = T)
+  return(nn)
+}
+
 m <- model.matrix(~dur + holiday + businessDay + peakHour + residencyProgram, data = train_)
 nn <- neuralnet(dur ~ holiday + businessDay + peakHour + residencyProgram, data = m, 
                 hidden = 3, linear.output = T)
@@ -90,5 +121,15 @@ table(pred = rpart.pred, true = testset[,1])
 library(caret)
 u <- union(rpart.pred, testset[,1])
 t <- table(factor(rpart.pred, u), factor(testset[,1], u))
-confusionMatrix(t)
-confusionMatrix(svm.t)
+# too big for confusion matrix...
+# confusionMatrix(t)
+# confusionMatrix(svm.t)
+
+# try random forest 
+library(randomForest)
+inquiry.rf <- randomForest(inquiry_pred[,-1], inquiry_pred[,1], prox=TRUE)
+iris.p <- classCenter(iris[,-5], iris[,5], iris.rf$prox)
+plot(iris[,3], iris[,4], pch=21, xlab=names(iris)[3], ylab=names(iris)[4],
+     bg=c("red", "blue", "green")[as.numeric(factor(iris$Species))],
+     main="Iris Data with Prototypes")
+points(iris.p[,3], iris.p[,4], pch=21, cex=2, bg=c("red", "blue", "green"))

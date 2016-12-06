@@ -4,11 +4,14 @@ library(neuralnet)
 library(chron)
 library(timeDate)
 
+# convert sessionStart to POSIXct
 clientSession$sessionStart <- as.POSIXct(clientSession$sessionStart)
 
+# convert year month day to date object (used in aggregate function)
 toDate <- function(year, month, day){
   ISOdate(year, month, day)
 }
+
 # aggregate outcome by hour 
 aggregateByHour <- function(x, start, y){
   time <- x[[start]]
@@ -29,9 +32,11 @@ aggregateByHour <- function(x, start, y){
 return(pred_df)
 }
 
+# aggregate data frames
 clientSession.ts <- aggregateByHour(clientSession, "sessionStart", "imageCount")
 inquiry.ts <- aggregateByHour(inquiry_table, "startTime", "duration")
 
+# function to get test and train indicies 
 get_train_ind<- function(pred){
   smp_size <- floor(0.75*nrow(pred))
   set.seed(123)
@@ -39,44 +44,48 @@ get_train_ind<- function(pred){
 return(train_ind)
 }
 
-# get indicies to split test and train data 
+# get indicies for clientSession and inquiry
 client_index <- get_train_ind(clientSession.ts)
 inquiry_index <- get_train_ind(inquiry.ts)
 
-# client train and test sets 
+# get client train and test sets 
 client_train <- clientSession.ts[client_index,]
 client_test <- clientSession.ts[-client_index,]
 
-# inquiry train and test sets 
+# get inquiry train and test sets 
 inquiry_train <- inquiry.ts[inquiry_index,]
 inquiry_test <- inquiry.ts[-inquiry_index,]
 
-# fit linear model to compare to NN 
+# fit linear model to compare to NN (inquiry)
 lm.inquiry <- glm(outcome~., data = inquiry_train)
 summary(lm.inquiry)
+
 pr.inquiry <- predict(lm.inquiry, inquiry_test)
 MSE.inquiry <- sum((pr.inquiry-inquiry_test$outcome)^2)/nrow(inquiry_test)
 
+# same for clientSession 
 lm.clientSession <- glm(outcome~., data = client_train)
 summary(lm.clientSession)
 pr.clientSession <- predict(lm.clientSession, client_test)
 MSE.clientSession <- sum((pr.clientSession-client_test$outcome)^2)/nrow(client_test)
 
+# scale data in preparation for neural network fit 
 scale_data <- function(pred){
   maxs <- apply(pred, 2, max)
   mins <- apply(pred, 2, min)
   scaled <- as.data.frame(scale(pred, center=mins, scale = maxs-mins))
 return(scaled)
 }
-# scaled data -- use to get new train and test data 
+
+# get scaled data for inquiry and clientSession 
 scaled_inquiry <- scale_data(inquiry.ts)
 scaled_client <- scale_data(clientSession.ts)
 
+# use scaled data to get new training and test sets for nn 
 inquiry_train_ <- scaled_inquiry[inquiry_index,]
 inquiry_test_ <- scaled_inquiry[-inquiry_index,]
 client_train_ <- scaled_client[client_index,]
 client_test_ <- scaled_client[-client_index,]
-
 
 # fit neural network to the data to predict hourly outcome 
 fit_nn <- function(train, hiddenVal){
@@ -86,6 +95,7 @@ fit_nn <- function(train, hiddenVal){
   return(nn)
 }
 
+# nn's for clientSession and inquiry 
 clientSession_nn <- fit_nn(client_train_, 3)
 inquiry_nn <- fit_nn(inquiry_train_, 3)
 
@@ -103,33 +113,22 @@ test_nn <- function(test, pred, nn){
 return(MSE.nn)
 }
 
-MSE.nn.cs <- test_nn(client_test_, clientSession.ts, clientSession_nn)
-MSE.nn.i <- test_nn(inquiry_test_, inquiry.ts, inquiry_nn)
+# MSE for nn's
+MSE.nn.CS <- test_nn(client_test_, clientSession.ts, clientSession_nn)
+MSE.nn.INQ <- test_nn(inquiry_test_, inquiry.ts, inquiry_nn)
+t <- as.data.frame(c(paste(MSE.inquiry, MSE.nn.i), paste(MSE.clientSession, MSE.nn.CS)), row.names = 
+                     c("MSE for inquiry duration", "MSE for clientSession imageCount"))
 
-m2 <- model.matrix(~dur + holiday + businessDay + peakHour + residencyProgram, data = test_)
-cols <- c("holiday", "businessDay", "peakHour", "residencyProgram")
-cov <- subset(m2, select = cols)
-pr.nn <- compute(nn, cov)
-pr.nn_ <- pr.nn$net.result*(max(inquiry_pred$dur)-
-                              min(inquiry_pred$dur))+min(inquiry_pred$dur)
-test.r <- (test_$dur) * (max(inquiry_pred$dur)-
-                           min(inquiry_pred$dur))+min(inquiry_pred$dur)
-MSE.nn <- sum((test.r-pr.nn_)^2)/nrow(test)
-print(paste(MSE.lm, MSE.nn))
-
-
-index <- 1:nrow(inquiry_pred)
-testindex <- sample(index, trunc(length(index)/3))
-testset <- inquiry_pred[testindex,]
-trainset <- inquiry_pred[-testindex,]
 
 # try random forest 
 library(randomForest)
 client.fit <- randomForest(outcome~., data=client_train, 
                     importance=TRUE, 
-                    ntree=100)
-iris.p <- classCenter(iris[,-5], iris[,5], iris.rf$prox)
-plot(iris[,3], iris[,4], pch=21, xlab=names(iris)[3], ylab=names(iris)[4],
-     bg=c("red", "blue", "green")[as.numeric(factor(iris$Species))],
-     main="Iris Data with Prototypes")
-points(iris.p[,3], iris.p[,4], pch=21, cex=2, bg=c("red", "blue", "green"))
+                    ntree=2000)
+varImpPlot(client.fit, main = "Importance of features for predicting hourly imageCount")
+client.pred <- predict(client.fit, client_test)
+table(client.pred, client_test$outcome)
+inquiry.fit <- randomForest(outcome~., data = inquiry_train, 
+                            importance=TRUE,
+                            ntree=2000)
+varImpPlot(inquiry.fit, main = "Importance of features for predicting hourly inquiry duration")

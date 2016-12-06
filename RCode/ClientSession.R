@@ -1,10 +1,10 @@
 ### load data 
-VisualDx.Data <- read.csv("clientSession(2014-2016).csv")
+VisualDx.Data <- read.csv("data/clientSession_2.csv")
 
 ### subset initial ClientSession table
 keep <- c("productId", "agent", "sessionStart", "sessionEnd", 
           "currentLicenseCount", "imageCount", "diagnosisCount")
-subset1 <- VisualDx.Data[keep]
+clientSession <- VisualDx.Data[keep]
 
 ### separate agent type: mobile vs. nonmobile
 x <- c("mobile", "apple", "android")
@@ -145,10 +145,3 @@ mHoliday <- subset(mDay, Date == "2014-01-01" | Date == "2015-01-01"
                    | Date == "2014-12-25" | Date == "2015-12-25")
 
 df <- aggregate(imageCount~Date, data=mHoliday,FUN=sum)
-
-    
-
-
-
-
-
