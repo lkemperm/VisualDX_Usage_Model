@@ -118,7 +118,7 @@ hist(inquiry_table$startTime, breaks = "years")
 # density graph of time 
 library(ggplot2)
 ggplot(inquiry_table, aes(startTime)) +
-  geom_density()
+  geom_density() + ggtitle("Density of new inquiries 2012-2015")
 ggplot(inquiry_table, aes(startTime, duration) ) +
   geom_jitter()
 
